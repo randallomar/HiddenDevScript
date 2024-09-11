@@ -1,1 +1,206 @@
-....
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = game.Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
+local Container = workspace.Areas.Container
+
+local Main = script.Parent.Main
+local Decor1, Decor2, ZoneName, Flower1, Flower2 = Main.Decor1, Main.Decor1.Decor2, Main.Decor1.ZoneName, Main.Flower1, Main.Flower2
+
+local Zone, ZoneText = Main.Zone, Main.Zone.ZoneText
+
+local areas = {
+	["Example"] = {
+		MainZone = "Abyss 1st Layer",
+		Atmosphere = {
+			Density = 0.4, 
+			Offset = 1,
+			Glare = 0, 
+			Haze = 1.48, 
+			Color = Color3.fromRGB(180, 194, 208), 
+			Decay = Color3.fromRGB(139, 184, 208)
+		}, 
+		Lighting = {
+			Ambient = Color3.fromRGB(0, 0, 0), 
+			Brightness = 2.86, 
+			ColorShift_Bottom = Color3.fromRGB(0, 0, 0), 
+			ColorShift_Top = Color3.fromRGB(180, 194, 208), 
+			EnvironmentDiffuseScale = 0.4, 
+			EnvironmentSpecularScale = 1, 
+			OutdoorAmbient = Color3.fromRGB(118, 146, 189), 
+			ShadowSoftness = 1, 
+			ClockTime = 14, 
+			GeographicLatitude = 41.733
+		}
+	}, 
+	["Example2"] = {
+		MainZone = "Orth",
+		Atmosphere = {
+			Density = 0.339, 
+			Glare = 0, 
+			Haze = 0, 
+			Color = Color3.fromRGB(199, 170, 107), 
+			Decay = Color3.fromRGB(92, 60, 13)
+		}, 
+		Lighting = {
+			Ambient = Color3.fromRGB(0, 0, 0), 
+			Brightness = 2.86, 
+			ColorShift_Bottom = Color3.fromRGB(0, 0, 0), 
+			ColorShift_Top = Color3.fromRGB(188, 216, 215), 
+			EnvironmentDiffuseScale = 0.17, 
+			EnvironmentSpecularScale = 0.607, 
+			OutdoorAmbient = Color3.fromRGB(118, 146, 189), 
+			ShadowSoftness = 0.65, 
+			ClockTime = 14, 
+			GeographicLatitude = 41.733
+		}
+	}, 
+}
+
+local InitialProperties = {
+	Decor1 = UDim2.new(0, 0, 0.65, 0), 
+	Decor2 = UDim2.new(0, 0, 0.659, 0),
+	ZoneTransparency = 1,
+	TextTransparency = 0,
+	Decor1BackgroundTransparency = 1,
+	Decor2UIStrokeTransparency = 1,
+	FlowerTransparency = 1,
+	FlowerRotation = 10,
+	FlowerRotation2 = -10
+}
+
+local FinalProperties = {
+	Decor1 = UDim2.new(1.146, 0, 0.65, 0), 
+	Decor2 = UDim2.new(0.972, 0, 0.659, 0),
+	TextTransparency = 1,
+	ZoneTransparency = 0,
+	Decor1BackgroundTransparency = 0.1,
+	Decor2UIStrokeTransparency = 0.25 
+}
+
+
+local currentArea = nil
+local currentMusic = nil
+
+
+local function transitionMusic(newMusic, duration)
+	local Music = newMusic:Clone()
+	if currentMusic then
+		local fadeOut = TweenService:Create(currentMusic, TweenInfo.new(duration), { Volume = 0 })
+		fadeOut:Play()
+		wait(duration / 2)
+		currentMusic:Stop()
+		currentMusic:Destroy()
+	end
+	
+	if workspace:FindFirstChild("CurrentMusic") then
+		workspace.CurrentMusic:Destroy()
+	end
+
+	Music.Volume = 1
+	Music.Name = "CurrentMusic"
+	Music.Parent = workspace
+	Music:Play()
+	currentMusic = Music
+
+
+	local fadeIn = TweenService:Create(Music, TweenInfo.new(duration), { Volume = Music.OriginalVolume.Value })
+	fadeIn:Play()
+end
+
+local function playAreaMusic(areaName, isCombat)
+	local soundPath = isCombat and "Combat" or "Ambient"
+	local sound = ReplicatedStorage.Assets.MusicZones[areaName][soundPath].Sound
+
+	transitionMusic(sound, 1)
+end
+
+
+for _, area in pairs(Container:GetChildren()) do
+	area.Touched:Connect(function(hit)
+		if area.Name ~= currentArea and hit.Parent == LocalPlayer.Character then
+			currentArea = area.Name
+			playAreaMusic(currentArea, false)
+			
+			ToggleAnim(true)
+
+			for property, value in pairs(areas[area.Name].Atmosphere) do
+				TweenService:Create(game.Lighting.Atmosphere, TweenInfo.new(3), {[property] = value}):Play()
+			end
+
+			for property, value in pairs(areas[area.Name].Lighting) do
+				TweenService:Create(game.Lighting, TweenInfo.new(3), {[property] = value}):Play()
+			end
+
+			wait(1)
+			task.spawn(function()
+				animateTextAppearance(areas[area.Name].MainZone, ZoneName)
+			end)
+			animateTextAppearance(area.Name, ZoneText)
+			wait(3)
+
+			if currentArea == area.Name then
+				ToggleAnim(false)
+				ZoneName.Text = ""
+				ZoneText.Text = ""
+			end
+		end
+	end)
+end
+
+
+-----
+function animateTextAppearance(text, Textlabel)
+	for i = 1, #text do
+		Textlabel.Text = text
+		script.Text:Play()
+		Textlabel.Text = string.sub(text, 1, i)
+		wait(0.05)
+	end
+end
+
+
+function ToggleAnim(isActive)
+	local targetProperties = isActive and FinalProperties or InitialProperties
+
+	local tweenInfoTransparency = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+	local transparencyGoal1 = {BackgroundTransparency = targetProperties.Decor1BackgroundTransparency}
+	local transparencyGoal2 = {Transparency = targetProperties.Decor2UIStrokeTransparency}
+	local goalZone = {BackgroundTransparency = targetProperties.ZoneTransparency or 1}
+	local goalText = {BackgroundTransparency = targetProperties.TextTransparency or 1}
+
+	local tweenTransparencyDecor1 = TweenService:Create(Decor1, tweenInfoTransparency, transparencyGoal1)
+	local tweenTransparencyDecor2 = TweenService:Create(Decor2.UIStroke, tweenInfoTransparency, transparencyGoal2)
+	local tweenZone = TweenService:Create(Zone, tweenInfoTransparency, goalZone)
+	local tweenZoneText = TweenService:Create(ZoneText, tweenInfoTransparency, goalText)
+
+	tweenTransparencyDecor1:Play()
+	tweenTransparencyDecor2:Play()
+	tweenZone:Play()
+
+	local tweenInfoSize = TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+	local goalDecor1 = {Size = targetProperties.Decor1}
+	local goalDecor2 = {Size = targetProperties.Decor2}
+
+	local tweenDecor1 = TweenService:Create(Decor1, tweenInfoSize, goalDecor1)
+	local tweenDecor2 = TweenService:Create(Decor2, tweenInfoSize, goalDecor2)
+
+	tweenDecor1:Play()
+	tweenDecor2:Play()
+	
+	wait(0.2)
+
+	local tweenInfoFlower = TweenInfo.new(1, Enum.EasingStyle.Circular, Enum.EasingDirection.Out)
+
+	local goalFlower1 = {ImageTransparency = targetProperties.FlowerTransparency or 0, Rotation = targetProperties.FlowerRotation or 0}
+	local goalFlower2 = {ImageTransparency = targetProperties.FlowerTransparency or 0, Rotation = targetProperties.FlowerRotation2 or 0}
+
+	local tweenFlower1 = TweenService:Create(Flower1, tweenInfoFlower, goalFlower1)
+	local tweenFlower2 = TweenService:Create(Flower2, tweenInfoFlower, goalFlower2)
+
+	tweenFlower1:Play()
+	tweenFlower2:Play()
+end
